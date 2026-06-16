@@ -301,14 +301,14 @@
 
     function writeLocalRecords(records) {
       try { localStorage.setItem(LOCAL_RECORDS_KEY, JSON.stringify(records)); }
-      catch (e) { alert('Error saving data. Check browser storage settings.'); }
+      catch (e) { alert('Error saving data.'); }
     }
 
     function addOrUpdateLocalRecord(rec) {
       let records = readLocalRecords();
       const idx = records.findIndex(r => r.id === rec.id);
       if (idx !== -1) {
-        records[idx] = rec;   // ← Important: Update existing record
+        records[idx] = rec;   // Update existing record
       } else {
         records.push(rec);
         if (rec.id > getLastId()) setLastId(rec.id);
@@ -396,7 +396,7 @@
     }
 
     function markPaid(id) {
-      if (!confirm('Mark this record as paid? Row will turn red.')) return;
+      if (!confirm('Mark this record as paid?')) return;
       let records = readLocalRecords();
       const rec = records.find(r => r.id === id);
       if (rec) { rec.paid = true; writeLocalRecords(records); load(); }
@@ -495,7 +495,6 @@
 
     window.addEventListener('load', () => { load(); updateSwDebug(); });
 
-    /* PWA install */
     let deferredInstallPrompt;
     window.addEventListener('beforeinstallprompt', e => {
       e.preventDefault();
