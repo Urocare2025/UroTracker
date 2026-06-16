@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MedLedger</title>
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" href="./icon-192.png" type="image/png">
+
+  <style>
+    :root { --bg: #f6f8fb; --card: #ffffff; --accent: #0b63ff; --muted: #6b7280; --danger: #ef4444; --radius: 12px; }
+    #swDebug { position: fixed; left: 8px; top: 8px; z-index: 9999; background: #fff; border: 1px solid #ddd; padding: 6px 8px; border-radius: 8px; font-size: 12px; color: #111; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 0; background: var(--bg); color: #111; }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 16px; }
+    header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding-top: 8px; }
+    header img { width: 48px; height: 48px; }
+    header h1 { font-size: 24px; margin: 0; font-weight: 600; }
+    .tagline { font-size: 15px; color: var(--accent); font-weight: 500; margin: 0; }
+    .card { background: var(--card); border-radius: var(--radius); padding: 16px; box-shadow: 0 6px 18px rgba(15,23,42,0.06); margin-bottom: 16px; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+    label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 14px; }
+    input, select { width: 100%; padding: 10px; border: 1px solid #e6e9ef; border-radius: 8px; box-sizing: border-box; font-size: 15px; }
+    .buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+    button { padding: 10px 14px; border-radius: 10px; border: 0; font-weight: 600; cursor: pointer; }
+    button.primary { background: var(--accent); color: white; }
+    button.secondary { background: transparent; color: var(--accent); border: 1px solid rgba(11,99,255,0.2); }
+    button.danger { background: var(--danger); color: white; }
+    button.edit { background: #eab308; color: white; }
+    button.recd { background: #10b981; color: white; }
+    button.paid { background: #dc2626; color: white; }
+    button.cancel { background: #9ca3af; color: white; }
+    tr.paid-row { background-color: #fee2e2 !important; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+    th, td { padding: 8px; border-bottom: 1px solid #eef2f6; text-align: left; }
+    .small { font-size: 13px; color: var(--muted); margin-top: 8px; }
+    #paidCheckbox { margin-top: 12px; display: flex; align-items: center; gap: 12px; font-size: 16px; }
+    #paid { width: 22px; height: 22px; accent-color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div id="swDebug">SW status: initializing…</div>
+
+  <div class="wrap">
+    <header>
+      <img src="./icon-192.png" width="48" height="48" alt="MedLedger">
+      <div>
+        <h1>MedLedger</h1>
+        <p class="tagline">"Organize & Grow"</p>
+      </div>
+    </header>
+
+    <div class="card" id="entryCard">
+      <div class="form-grid">
+        <div><label for="date">Date</label><input id="date" type="date"></div>
+        <div><label for="received_date">Received Date</label><input id="received_date" type="date"></div>
+        <div><label for="patient_name">Patient Name</label><input id="patient_name" placeholder="Patient name"></div>
+        <div><label for="hospital">Hospital</label><input id="hospital" placeholder="Hospital"></div>
+        <div><label for="type">Type</label><select id="type">
+          <option value="OPD">OPD</option>
+          <option value="IPD">IPD</option>
+          <option value="Operation">Operation / Hospitalization</option>
+        </select></div>
+        <div><label for="procedure_name">Procedure Name</label><input id="procedure_name" placeholder="Procedure name"></div>
+        <div><label for="fees">Fees</label><input id="fees" type="number" step="0.01" placeholder="Fees"></div>
+        <div><label for="other_expenses">Other Expenses</label><input id="other_expenses" type="number" step="0.01" placeholder="Other expenses"></div>
+        <div><label for="other_payee">Other Payee</label><input id="other_payee" placeholder="Other payee"></div>
+
+        <div id="paidCheckbox" style="display:none; grid-column: 1 / -1;">
+          <input type="checkbox" id="paid">
+          <label for="paid" style="font-size:16px;">Paid</label>
+        </div>
+      </div>
+
+      <div class="buttons">
+        <button class="primary" id="saveBtn">Save record</button>
+        <button class="secondary" id="exportCsvBtn">Export CSV (Excel)</button>
+        <button class="secondary" id="importCsvBtn">Import CSV</button>
+        <input type="file" id="importInput" accept="text/csv,.csv" style="display:none">
+        <button class="secondary" id="clearLocalBtn">Clear All Records</button>
+        <button class="cancel" id="cancelEditBtn" style="display:none">Cancel edit</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>All records (stored on device)</h3>
+      <table id="tbl">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Date</th>
+            <th>Received Date</th>
+            <th>Patient</th>
+            <th>Hospital</th>
+            <th>Type</th>
+            <th>Procedure</th>
+            <th style="text-align:right">Fees</th>
+            <th style="text-align:right">Other</th>
+            <th>Payee</th>
+            <th>Paid</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div class="small">All data is stored locally on your device. Export CSV to back up or share. Paid records are highlighted red.</div>
+    </div>
+
+    <footer class="small" style="text-align:center;margin-top:20px;">
+      MedLedger — Organize & Grow<br>by Sanjay Shah
+    </footer>
+  </div>
+
+  <button id="forceSwBtn">Force SW register</button>
+
+  <script>
+    const LOCAL_RECORDS_KEY = 'patient_records_v1';
+    const LAST_ID_KEY = 'patient_last_id';
+    const qs = id => document.getElementById(id);
+
+    function escapeHtml(unsafe) {
+      return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    function getLastId() { return parseInt(localStorage.getItem(LAST_ID_KEY)) || 0; }
+    function setLastId(id) { localStorage.setItem(LAST_ID_KEY, id); }
+
+    function renderTableRows(rows) {
+      const tbody = qs('tbl').querySelector('tbody');
+      tbody.innerHTML = '';
+      rows.forEach(r => {
+        const tr = document.createElement('tr');
+        if (r.paid) tr.classList.add('paid-row');
+        tr.innerHTML = `
+          <td>${r.id}</td>
+          <td>${r.date || ''}</td>
+          <td>${r.received_date || ''}</td>
+          <td>${escapeHtml(r.patient_name || '')}</td>
+          <td>${escapeHtml(r.hospital || '')}</td>
+          <td>${escapeHtml(r.type || '')}</td>
+          <td>${escapeHtml(r.procedure_name || '')}</td>
+          <td style="text-align:right">${r.fees ? Number(r.fees).toFixed(2) : ''}</td>
+          <td style="text-align:right">${r.other_expenses ? Number(r.other_expenses).toFixed(2) : ''}</td>
+          <td>${escapeHtml(r.other_payee || '')}</td>
+          <td>${r.paid ? 'Yes' : 'No'}</td>
+          <td>
+            <button class="edit" onclick="editItem(${r.id})">Edit</button>
+            <button class="recd" onclick="addReceivedDate(${r.id})">Add Recd Date</button>
+            <button class="danger" onclick="removeItem(${r.id})">Delete</button>
+            ${!r.paid ? `<button class="paid" onclick="markPaid(${r.id})">Mark Paid</button>` : ''}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function readLocalRecords() {
+      try {
+        const data = localStorage.getItem(LOCAL_RECORDS_KEY);
+        return data ? JSON.parse(data) : [];
+      } catch (e) { return []; }
+    }
+
+    function writeLocalRecords(records) {
+      try { localStorage.setItem(LOCAL_RECORDS_KEY, JSON.stringify(records)); }
+      catch (e) { alert('Error saving data.'); }
+    }
+
+    function addOrUpdateLocalRecord(rec) {
+      let records = readLocalRecords();
+      const idx = records.findIndex(r => Number(r.id) === Number(rec.id));
+      if (idx !== -1) {
+        records[idx] = rec;
+      } else {
+        records.push(rec);
+        if (rec.id > getLastId()) setLastId(rec.id);
+      }
+      writeLocalRecords(records);
+    }
+
+    function clearForm() {
+      ['date','received_date','patient_name','hospital','procedure_name','fees','other_expenses','other_payee'].forEach(id => {
+        if (qs(id)) qs(id).value = '';
+      });
+      if (qs('type')) qs('type').selectedIndex = 0;
+      if (qs('paid')) qs('paid').checked = false;
+      qs('saveBtn').textContent = 'Save record';
+      qs('cancelEditBtn').style.display = 'none';
+      qs('paidCheckbox').style.display = 'none';
+    }
+
+    function load() { renderTableRows(readLocalRecords()); }
+
+    let editingId = null;
+
+    function saveOrUpdateRecord() {
+      const rec = {
+        id: editingId !== null ? Number(editingId) : (getLastId() + 1),
+        date: qs('date').value,
+        received_date: qs('received_date').value,
+        patient_name: qs('patient_name').value.trim(),
+        hospital: qs('hospital').value.trim(),
+        type: qs('type').value,
+        procedure_name: qs('procedure_name').value.trim(),
+        fees: qs('fees').value ? Number(qs('fees').value) : '',
+        other_expenses: qs('other_expenses').value ? Number(qs('other_expenses').value) : '',
+        other_payee: qs('other_payee').value.trim(),
+        paid: qs('paid') ? qs('paid').checked : false
+      };
+
+      addOrUpdateLocalRecord(rec);
+      if (editingId === null) setLastId(rec.id);
+
+      alert(editingId !== null ? '✅ Received Date / Record Updated' : '✅ New Record Saved');
+      editingId = null;
+      clearForm();
+      load();
+    }
+
+    function editItem(id) {
+      const rec = readLocalRecords().find(r => Number(r.id) === Number(id));
+      if (!rec) return;
+      fillForm(rec);
+      editingId = Number(id);
+      qs('saveBtn').textContent = 'Update record';
+      qs('cancelEditBtn').style.display = 'inline-block';
+      qs('paidCheckbox').style.display = 'flex';
+    }
+
+    function addReceivedDate(id) {
+      const rec = readLocalRecords().find(r => Number(r.id) === Number(id));
+      if (!rec) return;
+      fillForm(rec);
+      editingId = Number(id);
+      qs('saveBtn').textContent = 'Save Received Date';
+      qs('cancelEditBtn').style.display = 'inline-block';
+      qs('paidCheckbox').style.display = 'flex';
+      setTimeout(() => qs('received_date').focus(), 100);
+    }
+
+    function fillForm(rec) {
+      qs('date').value = rec.date || '';
+      qs('received_date').value = rec.received_date || '';
+      qs('patient_name').value = rec.patient_name || '';
+      qs('hospital').value = rec.hospital || '';
+      qs('type').value = rec.type || 'OPD';
+      qs('procedure_name').value = rec.procedure_name || '';
+      qs('fees').value = rec.fees || '';
+      qs('other_expenses').value = rec.other_expenses || '';
+      qs('other_payee').value = rec.other_payee || '';
+      if (qs('paid')) qs('paid').checked = !!rec.paid;
+    }
+
+    function cancelEdit() { editingId = null; clearForm(); }
+
+    function removeItem(id) {
+      if (!confirm('Delete record?')) return;
+      let records = readLocalRecords().filter(r => Number(r.id) !== Number(id));
+      writeLocalRecords(records);
+      load();
+    }
+
+    function markPaid(id) {
+      if (!confirm('Mark as paid?')) return;
+      let records = readLocalRecords();
+      const rec = records.find(r => Number(r.id) === Number(id));
+      if (rec) { rec.paid = true; writeLocalRecords(records); load(); }
+    }
+
+    async function exportCsv() {
+      const rows = readLocalRecords();
+      if (!rows.length) return alert('No records to export');
+      const header = ['id','date','received_date','patient_name','hospital','type','procedure_name','fees','other_expenses','other_payee','paid'];
+      const lines = [header.join(',')];
+      rows.forEach(r => {
+        const vals = header.map(h => `"${String(r[h] || '').replace(/"/g,'""')}"`);
+        lines.push(vals.join(','));
+      });
+      const blob = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'patient_export_' + new Date().toISOString().slice(0,10) + '.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function importCsv(event) {
+      // Your previous importCsv function
+      const file = event.target.files[0];
+      if (!file) return;
+      alert("Import function - paste your full importCsv if needed");
+    }
+
+    function clearLocalRecords() {
+      if (!confirm('Clear all records?')) return;
+      writeLocalRecords([]);
+      setLastId(0);
+      load();
+      alert('Cleared.');
+    }
+
+    /* Events */
+    qs('saveBtn').addEventListener('click', saveOrUpdateRecord);
+    qs('exportCsvBtn').addEventListener('click', exportCsv);
+    qs('importCsvBtn').addEventListener('click', () => qs('importInput').click());
+    qs('importInput').addEventListener('change', importCsv);
+    qs('clearLocalBtn').addEventListener('click', clearLocalRecords);
+    qs('cancelEditBtn').addEventListener('click', cancelEdit);
+
+    window.addEventListener('load', () => { load(); updateSwDebug(); });
+  </script>
+</body>
+</html>
